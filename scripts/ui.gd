@@ -262,11 +262,13 @@ func _build_hud() -> void:
 	hint_label.position = Vector2(16, -16)
 	hint_label.offset_top = -34
 	hud.add_child(hint_label)
-	# Walkie-talkie panel (bottom-right).
+	# Walkie-talkie panel (bottom-right). Sized to fit the longest status
+	# ("WALKIE CH-04  •  NO RESPONSE — STATIC" is 318px at 16px); the old
+	# 200px minimum let the text run past the right screen edge.
 	walkie_panel = PanelContainer.new()
 	walkie_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	walkie_panel.position = Vector2(-220, -70)
-	walkie_panel.custom_minimum_size = Vector2(200, 44)
+	walkie_panel.position = Vector2(-360, -70)
+	walkie_panel.custom_minimum_size = Vector2(340, 44)
 	walkie_panel.visible = false
 	hud.add_child(walkie_panel)
 	walkie_label = _make_label("WALKIE CH-04", 16, Color(0.9, 0.9, 0.85))
@@ -380,6 +382,11 @@ func set_walkie(on: bool, status: String) -> void:
 	walkie_panel.visible = on
 	if on:
 		walkie_label.text = "WALKIE CH-04  •  " + status
+		# Fit the panel to the text, growing leftward from a 16px right
+		# margin, so the full status is always on-screen whatever its length.
+		var w := walkie_panel.get_combined_minimum_size().x
+		walkie_panel.offset_right = -16.0
+		walkie_panel.offset_left = -16.0 - w
 
 func toast(text: String, duration := 3.0) -> void:
 	toast_label.text = text

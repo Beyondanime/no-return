@@ -153,6 +153,15 @@ func _run() -> void:
 		await process_frame
 		_check(main.ui.walkie_panel.visible, "WALKIE button opens the walkie panel")
 
+		# --- Walkie panel fits on-screen (regression: the status text ran
+		# ~12px past the right edge). Longest status must stay in-bounds. ---
+		main.ui.set_walkie(true, "NO RESPONSE — STATIC")
+		await process_frame
+		await process_frame
+		var wr: Rect2 = main.ui.walkie_panel.get_global_rect()
+		_check(wr.end.x <= vp.x and wr.position.x >= 0.0, "walkie panel fully on-screen with longest status (rect %s, viewport %s)" % [wr, vp])
+		main.ui.set_walkie(false, "")
+
 		# --- PAUSE button: pause menu opens, resume works. ---
 		_touch(6, _button_center(4), true)
 		await process_frame
