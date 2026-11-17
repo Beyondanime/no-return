@@ -1,0 +1,29 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+
+config_version=5
+
+[application]
+
+config/name="No Return: Starved Rock"
+config/description="Four friends. One closed park. No way back. A first-person horror slice set in Starved Rock State Park."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.02, 0.02, 0.05, 1)
+textures/default_filters/use_nearest_mipmap_filter=true
+textures/vram_compression/import_etc2_astc=true

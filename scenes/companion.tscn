@@ -1,0 +1,120 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/companion.gd" id="1_cmp1"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_cmp1"]
+radius = 0.4
+height = 1.7
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_cmp1"]
+radius = 0.32
+height = 1.15
+
+[sub_resource type="SphereMesh" id="SphereMesh_cmp1"]
+radius = 0.21
+height = 0.42
+
+[sub_resource type="SphereMesh" id="SphereMesh_hair"]
+radius = 0.22
+height = 0.44
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_leg"]
+top_radius = 0.09
+bottom_radius = 0.1
+height = 0.7
+radial_segments = 8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_arm"]
+top_radius = 0.07
+bottom_radius = 0.08
+height = 0.65
+radial_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp1"]
+albedo_color = Color(0.7, 0.15, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp2"]
+albedo_color = Color(0.85, 0.65, 0.5, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp3"]
+albedo_color = Color(0.15, 0.15, 0.18, 1)
+roughness = 1.0
+
+[node name="Companion" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_cmp1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_cmp1")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+mesh = SubResource("CapsuleMesh_cmp1")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+
+[node name="HeadPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.72, 0)
+
+[node name="Head" type="MeshInstance3D" parent="HeadPivot"]
+mesh = SubResource("SphereMesh_cmp1")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp2")
+
+[node name="Hair" type="MeshInstance3D" parent="HeadPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+mesh = SubResource("SphereMesh_hair")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+
+[node name="LegL" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 0.7, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="LegL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+
+[node name="LegR" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 0.7, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="LegR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+
+[node name="ArmL" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 1.45, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="ArmL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.32, 0)
+mesh = SubResource("CylinderMesh_arm")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+
+[node name="ArmR" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 1.45, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="ArmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.32, 0)
+mesh = SubResource("CylinderMesh_arm")
+surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
+text = "Chris"
+font_size = 48
+pixel_size = 0.008
+billboard = 1
+modulate = Color(1, 1, 1, 1)
+outline_size = 12
+outline_modulate = Color(0, 0, 0, 1)
+
+[node name="BarkLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+visible = false
+font_size = 32
+pixel_size = 0.007
+billboard = 1
+modulate = Color(1, 0.95, 0.8, 1)
+outline_size = 10
+outline_modulate = Color(0, 0, 0, 1)
