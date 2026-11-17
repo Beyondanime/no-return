@@ -18,6 +18,7 @@ var ending_screen: Control
 var objective_label: Label
 var explored_label: Label
 var clock_label: Label
+var controls_label: Label # title-screen "HOW TO PLAY" text (keyboard or touch)
 var rec_dot: ColorRect
 var rec_label: Label
 var toast_label: Label
@@ -195,6 +196,7 @@ func _build_title() -> void:
 	quit_btn.pressed.connect(func() -> void: quit_game_pressed.emit())
 	box.add_child(quit_btn)
 	var controls := _make_label("WASD move   •   Mouse look   •   SHIFT sprint   •   SPACE jump\nF flashlight   •   N night vision   •   T walkie-talkie   •   ESC pause\n\nObjective: hike every trail. Visit each canyon. Film everything.", 16, Color(0.75, 0.75, 0.68))
+	controls_label = controls
 	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls.visible = false
 	box.add_child(controls)
@@ -354,6 +356,12 @@ func show_ending(stats: String) -> void:
 	ending_screen.visible = true
 	hud.visible = false
 	pause_menu.visible = false
+
+func set_touch_mode() -> void:
+	# On phones the keyboard hints are wrong — say what the thumbs do.
+	hint_label.text = "Left stick move  •  Drag right side to look  •  Push stick to the edge to sprint"
+	if controls_label != null:
+		controls_label.text = "Left stick move   •   Drag right side to look   •   Push stick to the edge to sprint\nJUMP button   •   LIGHT flashlight   •   NIGHT night vision   •   WALKIE walkie-talkie\n\nObjective: hike every trail. Visit each canyon. Film everything."
 
 func set_objective(line1: String, line2: String) -> void:
 	objective_label.text = line1 + "\n" + line2

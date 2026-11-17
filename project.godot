@@ -22,6 +22,16 @@ window/size/resizable=true
 
 common/physics_ticks_per_second=60
 
+[input_devices]
+
+pointing/emulate_mouse_from_touch=false
+# Touch devices get custom controls (touch_controls.gd) driven by raw
+# screen-touch events. With mouse emulation on, a touch would ALSO arrive
+# as an emulated mouse-motion event while the mouse is captured, and the
+# player would turn twice as fast — and every touch button would fire twice
+# (once for the touch, once for the emulated mouse click). Buttons already
+# handle screen touches natively, so nothing is lost by turning it off.
+
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.02, 0.02, 0.05, 1)

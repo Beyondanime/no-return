@@ -19,6 +19,7 @@ const WorldBuilderScript := preload("res://scripts/world_builder.gd")
 const DayNightScript := preload("res://scripts/day_night.gd")
 const AudioSynthScript := preload("res://scripts/audio_synth.gd")
 const GameUIScript := preload("res://scripts/ui.gd")
+const TouchControlsScript := preload("res://scripts/touch_controls.gd")
 
 const TRIP_DATE := "NOV.14.2026"
 const CANYON_TIMES := [11.0, 14.0, 17.0, 19.5] # clock after each story canyon
@@ -44,6 +45,7 @@ var companions: Array = []
 var day_night: DayNight
 var audio: AudioSynth
 var ui: GameUI
+var touch_controls: TouchControls
 var sun_pivot: Node3D
 var sun: DirectionalLight3D
 var moon: DirectionalLight3D
@@ -112,6 +114,12 @@ func _ready() -> void:
 	ui.set_clock(_format_clock())
 	ui.set_objective("SET UP CAMP", "Reach the campsite")
 	ui.set_explored(0, 18)
+	touch_controls = TouchControlsScript.new()
+	touch_controls.name = "TouchControls"
+	add_child(touch_controls)
+	touch_controls.setup(player, ui)
+	if touch_controls.touch_enabled:
+		ui.set_touch_mode()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _setup_input() -> void:
@@ -588,6 +596,8 @@ func _on_player_stepped() -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if touch_controls != null:
+		touch_controls.set_playing(state == State.PLAYING)
 	# The cloud dome follows the camera (it is a sky, not a place).
 	if cloud_dome != null and player != null:
 		cloud_dome.global_position = player.global_position

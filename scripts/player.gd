@@ -30,10 +30,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		return
 	if event is InputEventMouseMotion:
-		var motion := event as InputEventMouseMotion
-		rotate_y(-motion.relative.x * MOUSE_SENS)
-		pitch = clampf(pitch - motion.relative.y * MOUSE_SENS, -1.55, 1.55)
-		head.rotation.x = pitch
+		apply_look((event as InputEventMouseMotion).relative)
+
+func apply_look(relative: Vector2) -> void:
+	## Shared by mouse look and the touch look-drag (touch_controls.gd
+	## scales the drag before calling this, so the math stays in one place).
+	rotate_y(-relative.x * MOUSE_SENS)
+	pitch = clampf(pitch - relative.y * MOUSE_SENS, -1.55, 1.55)
+	head.rotation.x = pitch
 
 func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
