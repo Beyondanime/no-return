@@ -1,46 +1,10 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/companion.gd" id="1_cmp1"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_cmp1"]
 radius = 0.4
 height = 1.7
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_cmp1"]
-radius = 0.32
-height = 1.15
-
-[sub_resource type="SphereMesh" id="SphereMesh_cmp1"]
-radius = 0.21
-height = 0.42
-
-[sub_resource type="SphereMesh" id="SphereMesh_hair"]
-radius = 0.22
-height = 0.44
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_leg"]
-top_radius = 0.09
-bottom_radius = 0.1
-height = 0.7
-radial_segments = 8
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_arm"]
-top_radius = 0.07
-bottom_radius = 0.08
-height = 0.65
-radial_segments = 8
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp1"]
-albedo_color = Color(0.7, 0.15, 0.12, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp2"]
-albedo_color = Color(0.85, 0.65, 0.5, 1)
-roughness = 0.8
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmp3"]
-albedo_color = Color(0.15, 0.15, 0.18, 1)
-roughness = 1.0
 
 [node name="Companion" type="CharacterBody3D"]
 collision_layer = 2
@@ -50,54 +14,64 @@ script = ExtResource("1_cmp1")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape3D_cmp1")
 
-[node name="Body" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
-mesh = SubResource("CapsuleMesh_cmp1")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+[node name="Body" type="Node3D" parent="."]
+
+[node name="Torso" type="MeshInstance3D" parent="Body"]
 
 [node name="HeadPivot" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.72, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.62, 0)
 
 [node name="Head" type="MeshInstance3D" parent="HeadPivot"]
-mesh = SubResource("SphereMesh_cmp1")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp2")
 
-[node name="Hair" type="MeshInstance3D" parent="HeadPivot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
-mesh = SubResource("SphereMesh_hair")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+[node name="Face" type="MeshInstance3D" parent="HeadPivot"]
 
 [node name="LegL" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 0.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.11, 0.85, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="LegL"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
-mesh = SubResource("CylinderMesh_leg")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+[node name="Thigh" type="MeshInstance3D" parent="LegL"]
+
+[node name="ShinPivot" type="Node3D" parent="LegL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.42, 0)
+
+[node name="Shin" type="MeshInstance3D" parent="LegL/ShinPivot"]
+
+[node name="Shoe" type="MeshInstance3D" parent="LegL/ShinPivot"]
 
 [node name="LegR" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 0.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.11, 0.85, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="LegR"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
-mesh = SubResource("CylinderMesh_leg")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp3")
+[node name="Thigh" type="MeshInstance3D" parent="LegR"]
+
+[node name="ShinPivot" type="Node3D" parent="LegR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.42, 0)
+
+[node name="Shin" type="MeshInstance3D" parent="LegR/ShinPivot"]
+
+[node name="Shoe" type="MeshInstance3D" parent="LegR/ShinPivot"]
 
 [node name="ArmL" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 1.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, 1.38, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="ArmL"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.32, 0)
-mesh = SubResource("CylinderMesh_arm")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+[node name="UpperArm" type="MeshInstance3D" parent="ArmL"]
+
+[node name="ForearmPivot" type="Node3D" parent="ArmL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 0)
+
+[node name="Forearm" type="MeshInstance3D" parent="ArmL/ForearmPivot"]
+
+[node name="Hand" type="MeshInstance3D" parent="ArmL/ForearmPivot"]
 
 [node name="ArmR" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 1.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, 1.38, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="ArmR"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.32, 0)
-mesh = SubResource("CylinderMesh_arm")
-surface_material_override/0 = SubResource("StandardMaterial3D_cmp1")
+[node name="UpperArm" type="MeshInstance3D" parent="ArmR"]
+
+[node name="ForearmPivot" type="Node3D" parent="ArmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 0)
+
+[node name="Forearm" type="MeshInstance3D" parent="ArmR/ForearmPivot"]
+
+[node name="Hand" type="MeshInstance3D" parent="ArmR/ForearmPivot"]
 
 [node name="NameLabel" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)

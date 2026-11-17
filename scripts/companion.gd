@@ -32,40 +32,32 @@ var idle_time := 0.0
 var moving := false
 var _last_pos := Vector3.ZERO
 
-@onready var body_mesh: MeshInstance3D = $Body
+@onready var body_node: Node3D = $Body
+@onready var torso_mesh: MeshInstance3D = $Body/Torso
 @onready var head_pivot: Node3D = $HeadPivot
-@onready var hair_mesh: MeshInstance3D = $HeadPivot/Hair
 @onready var leg_l: Node3D = $LegL
 @onready var leg_r: Node3D = $LegR
+@onready var shin_l: Node3D = $LegL/ShinPivot
+@onready var shin_r: Node3D = $LegR/ShinPivot
 @onready var arm_l: Node3D = $ArmL
 @onready var arm_r: Node3D = $ArmR
+@onready var fore_l: Node3D = $ArmL/ForearmPivot
+@onready var fore_r: Node3D = $ArmR/ForearmPivot
 @onready var name_label: Label3D = $NameLabel
 @onready var bark_label: Label3D = $BarkLabel
 
-func setup(p_name: String, shirt_color: Color, target: Node3D, offset: Vector3) -> void:
-	friend_name = p_name
+func setup(def: Dictionary, target: Node3D, offset: Vector3) -> void:
+	friend_name = def.get("name", "Chris")
 	follow_target = target
 	slot_offset = offset
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = shirt_color
-	mat.roughness = 0.9
-	body_mesh.material_override = mat
-	name_label.text = p_name
-	name_label.modulate = shirt_color.lightened(0.4)
+	Humanoid.build_companion(self, def)
+	name_label.text = friend_name
+	name_label.modulate = (def.get("shirt", Color(0.8, 0.2, 0.15)) as Color).lightened(0.4)
+	# "height" in the defs is a scale factor around the 1.75 m base build.
+	scale = Vector3.ONE * float(def.get("height", 1.0))
 
-func customize(hair_color: Color, hair_style: int, height_scale: float) -> void:
-	# hair_style: 0 short, 1 curly, 2 cap.
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = hair_color
-	mat.roughness = 0.95
-	hair_mesh.material_override = mat
-	match hair_style:
-		0:
-			hair_mesh.scale = Vector3(1.05, 0.45, 1.05)
-		1:
-			hair_mesh.scale = Vector3(1.15, 0.85, 1.15)
-		_:
-			hair_mesh.scale = Vector3(1.08, 0.5, 1.08)
+func customize(_hair_color: Color, _hair_style: int, height_scale: float) -> void:
+	# Kept for compatibility; the look is now built in setup() via Humanoid.
 	scale = Vector3.ONE * height_scale
 
 func set_path(p_path: Array, p_offset: int) -> void:
@@ -103,7 +95,8 @@ func _process(delta: float) -> void:
 		bark_timer -= delta
 		if bark_timer <= 0.0:
 			bark_label.visible = false
-	# Walk cycle / idle animation.
+	# Walk cycle / idle animation. Two-segment limbs: thighs swing, knees
+	# bend on the forward swing, elbows keep a slight bend.
 	var moved := global_position.distance_to(_last_pos)
 	_last_pos = global_position
 	if moving:
@@ -111,20 +104,34 @@ func _process(delta: float) -> void:
 		var s := sin(walk_phase)
 		leg_l.rotation.x = s * 0.55
 		leg_r.rotation.x = -s * 0.55
+		shin_l.rotation.x = -maxf(0.0, s) * 0.7
+		shin_r.rotation.x = -maxf(0.0, -s) * 0.7
 		arm_l.rotation.x = -s * 0.45
 		arm_r.rotation.x = s * 0.45
-		body_mesh.position.y = 0.95 + absf(cos(walk_phase)) * 0.045
+		fore_l.rotation.x = -0.2 - maxf(0.0, -s) * 0.4
+		fore_r.rotation.x = -0.2 - maxf(0.0, s) * 0.4
+		body_node.position.y = absf(cos(walk_phase)) * 0.045
+		body_node.rotation.z = s * 0.03
+		body_node.rotation.x = 0.04
+		head_pivot.position.y = 1.62 + absf(cos(walk_phase)) * 0.02
 		head_pivot.rotation.y = lerpf(head_pivot.rotation.y, 0.0, delta * 6.0)
 	else:
 		# Ease limbs back to neutral, breathe, look around.
 		leg_l.rotation.x = lerpf(leg_l.rotation.x, 0.0, delta * 8.0)
 		leg_r.rotation.x = lerpf(leg_r.rotation.x, 0.0, delta * 8.0)
+		shin_l.rotation.x = lerpf(shin_l.rotation.x, 0.0, delta * 8.0)
+		shin_r.rotation.x = lerpf(shin_r.rotation.x, 0.0, delta * 8.0)
 		arm_l.rotation.x = lerpf(arm_l.rotation.x, 0.0, delta * 8.0)
 		arm_r.rotation.x = lerpf(arm_r.rotation.x, 0.0, delta * 8.0)
-		body_mesh.position.y = lerpf(body_mesh.position.y, 0.95, delta * 8.0)
+		fore_l.rotation.x = lerpf(fore_l.rotation.x, -0.15, delta * 8.0)
+		fore_r.rotation.x = lerpf(fore_r.rotation.x, -0.15, delta * 8.0)
+		body_node.position.y = lerpf(body_node.position.y, 0.0, delta * 8.0)
+		body_node.rotation.z = lerpf(body_node.rotation.z, 0.0, delta * 8.0)
+		body_node.rotation.x = lerpf(body_node.rotation.x, 0.0, delta * 8.0)
+		head_pivot.position.y = lerpf(head_pivot.position.y, 1.62, delta * 8.0)
 		idle_time += delta
 		var breathe := 1.0 + sin(idle_time * 1.6) * 0.015
-		body_mesh.scale = Vector3(1.0, breathe, 1.0)
+		torso_mesh.scale = Vector3(1.0, breathe, 1.0)
 		if has_face_target:
 			var to := face_target - global_position
 			var target_yaw := atan2(-to.x, -to.z) - rotation.y

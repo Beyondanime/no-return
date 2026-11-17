@@ -10,6 +10,7 @@ var sun_pivot: Node3D
 var world_env: WorldEnvironment
 var sky_mat: ProceduralSkyMaterial
 var env: Environment
+var cloud_mat: StandardMaterial3D
 
 var time_hours := 8.0
 var target_hours := 8.0
@@ -26,13 +27,14 @@ var night_top := Color(0.01, 0.015, 0.05)
 var night_horizon := Color(0.03, 0.04, 0.09)
 var night_ground := Color(0.01, 0.01, 0.02)
 
-func setup(p_sun: DirectionalLight3D, p_moon: DirectionalLight3D, p_pivot: Node3D, p_env: WorldEnvironment) -> void:
+func setup(p_sun: DirectionalLight3D, p_moon: DirectionalLight3D, p_pivot: Node3D, p_env: WorldEnvironment, p_cloud_mat: StandardMaterial3D = null) -> void:
 	sun = p_sun
 	moon = p_moon
 	sun_pivot = p_pivot
 	world_env = p_env
 	env = p_env.environment
 	sky_mat = env.sky.sky_material as ProceduralSkyMaterial
+	cloud_mat = p_cloud_mat
 	_apply_time()
 
 func set_time(hours: float) -> void:
@@ -82,7 +84,17 @@ func _apply_time() -> void:
 	sky_mat.sky_horizon_color = horizon
 	sky_mat.ground_bottom_color = ground
 	sky_mat.ground_horizon_color = horizon.darkened(0.3)
-	# Fog and ambient.
-	env.fog_density = lerpf(0.0018, 0.014, t_night)
+	# Fog and ambient. Night fog is thick and grey-green (Ref 1: the
+	# Silent-Hill-style fog the player walks through after dark).
+	env.fog_density = lerpf(0.0012, 0.016, t_night)
 	env.ambient_light_energy = lerpf(lerpf(0.5, 0.55, t_day), 0.06, t_night)
-	env.fog_light_color = horizon
+	env.fog_light_color = horizon.lerp(Color(0.42, 0.47, 0.42), t_night * 0.5)
+	# Volumetric fog (Forward+ only; ignored on web) thickens at night.
+	env.volumetric_fog_density = lerpf(0.006, 0.03, t_night)
+	# Clouds: bright by day, warm at sunset, dark and thin at night.
+	if cloud_mat != null:
+		var cloud_day := Color(1.0, 1.0, 1.0, 0.9)
+		var cloud_sunset := Color(1.0, 0.62, 0.4, 0.85)
+		var cloud_night := Color(0.12, 0.14, 0.2, 0.4)
+		var cc := cloud_sunset.lerp(cloud_day, t_day).lerp(cloud_night, t_night)
+		cloud_mat.albedo_color = cc

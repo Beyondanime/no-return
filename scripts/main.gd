@@ -49,6 +49,8 @@ var sun: DirectionalLight3D
 var moon: DirectionalLight3D
 var world_env: WorldEnvironment
 var nv_light: SpotLight3D
+var cloud_dome: MeshInstance3D
+var cloud_mat: StandardMaterial3D
 
 var player_path: Array = [] # breadcrumb trail of the player's positions
 var _path_last := Vector3.ZERO
@@ -92,7 +94,7 @@ func _ready() -> void:
 	day_night = DayNightScript.new()
 	day_night.name = "DayNight"
 	add_child(day_night)
-	day_night.setup(sun, moon, sun_pivot, world_env)
+	day_night.setup(sun, moon, sun_pivot, world_env, cloud_mat)
 	day_night.set_time(8.0)
 	audio = AudioSynthScript.new()
 	audio.name = "Audio"
@@ -144,16 +146,53 @@ func _build_sky() -> void:
 	environment.ambient_light_energy = 0.5
 	environment.fog_enabled = true
 	environment.fog_light_color = Color(0.65, 0.8, 0.95)
-	environment.fog_density = 0.0018
+	environment.fog_density = 0.0012
 	environment.fog_sky_affect = 0.5
+	# Filmic render: ACES tonemapping + glow for depth, SSAO + volumetric
+	# fog where the renderer supports them (Forward+ on desktop; the web
+	# Compatibility renderer ignores SSAO/volumetric fog and keeps the
+	# standard fog + glow, so the game still looks right in a browser).
+	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	environment.tonemap_exposure = 1.0
+	environment.glow_enabled = true
+	environment.glow_intensity = 0.35
+	environment.glow_bloom = 0.08
+	environment.ssao_enabled = true
+	environment.ssao_radius = 1.2
+	environment.ssao_intensity = 1.0
+	environment.volumetric_fog_enabled = true
+	environment.volumetric_fog_density = 0.006
+	environment.adjustment_enabled = true
+	environment.adjustment_saturation = 0.88
+	environment.adjustment_contrast = 1.04
 	world_env.environment = environment
 	add_child(world_env)
+	# Cloud dome: a big textured sphere that follows the camera (the sky
+	# itself has no clouds). Unshaded, transparent, seen from inside.
+	cloud_mat = StandardMaterial3D.new()
+	cloud_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cloud_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cloud_mat.albedo_texture = preload("res://assets/generated/clouds.png")
+	cloud_mat.albedo_color = Color(1, 1, 1, 0.9)
+	cloud_mat.cull_mode = BaseMaterial3D.CULL_FRONT
+	cloud_dome = MeshInstance3D.new()
+	cloud_dome.name = "CloudDome"
+	var dome_mesh := SphereMesh.new()
+	dome_mesh.radius = 80.0
+	dome_mesh.height = 160.0
+	dome_mesh.radial_segments = 32
+	dome_mesh.rings = 16
+	cloud_dome.mesh = dome_mesh
+	cloud_dome.material_override = cloud_mat
+	add_child(cloud_dome)
 	sun_pivot = Node3D.new()
 	sun_pivot.name = "SunPivot"
 	add_child(sun_pivot)
 	sun = DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.shadow_enabled = true
+	sun.shadow_blur = 1.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	sun.directional_shadow_max_distance = 250.0
 	sun.light_energy = 1.15
 	sun_pivot.add_child(sun)
@@ -183,14 +222,17 @@ func _spawn_player_and_friends() -> void:
 	nv_light.spot_range = 26.0
 	player.get_node("Head/Camera3D").add_child(nv_light)
 	# The three friends. Sal is index 1 — the first to go.
-	# Distinct looks: shirt, hair, height. Chris is tallest, Harry shortest.
+	# Distinct looks: shirt, face, hair, height. Chris is tallest, Harry shortest.
 	var defs := [
-		{"name": "Chris", "color": Color(0.7, 0.15, 0.12), "offset": Vector3(-1.6, 0, 2.6),
-			"hair": Color(0.1, 0.08, 0.06), "style": 0, "height": 1.06, "path_off": 10},
-		{"name": "Sal", "color": Color(0.12, 0.3, 0.65), "offset": Vector3(0, 0, 3.6),
-			"hair": Color(0.16, 0.1, 0.06), "style": 1, "height": 1.0, "path_off": 20},
-		{"name": "Harry", "color": Color(0.75, 0.6, 0.1), "offset": Vector3(1.6, 0, 2.6),
-			"hair": Color(0.75, 0.6, 0.25), "style": 2, "height": 0.95, "path_off": 30},
+		{"name": "Chris", "shirt": Color(0.7, 0.15, 0.12), "offset": Vector3(-1.6, 0, 2.6),
+			"face": "res://assets/generated/face_chris.png", "hair": "res://assets/generated/hair_short.png",
+			"hair_style": 0, "hair_radius": 0.106, "height": 1.06, "path_off": 10},
+		{"name": "Sal", "shirt": Color(0.12, 0.3, 0.65), "offset": Vector3(0, 0, 3.6),
+			"face": "res://assets/generated/face_sal.png", "hair": "res://assets/generated/hair_curly.png",
+			"hair_style": 2, "hair_radius": 0.115, "height": 1.0, "path_off": 20},
+		{"name": "Harry", "shirt": Color(0.75, 0.6, 0.1), "offset": Vector3(1.6, 0, 2.6),
+			"face": "res://assets/generated/face_harry.png", "hair": "res://assets/generated/hair_blond.png",
+			"hair_style": 1, "hair_radius": 0.106, "height": 0.95, "path_off": 30},
 	]
 	for d in defs:
 		var c := CompanionScene.instantiate() as Companion
@@ -199,10 +241,11 @@ func _spawn_player_and_friends() -> void:
 		spawn.y = world.ground_height_at(spawn.x, spawn.z) + 1.2
 		c.position = spawn
 		add_child(c)
-		c.setup(d["name"], d["color"], player, d["offset"])
-		c.customize(d["hair"], d["style"], d["height"])
+		c.setup(d, player, d["offset"])
 		c.set_path(player_path, d["path_off"])
 		companions.append(c)
+	# Jayce's visible hands + camcorder (first-person, not blocky).
+	Humanoid.build_jayce_hands(player.get_node("Head/Camera3D"))
 
 func _make_triggers() -> void:
 	for i in range(world.canyons.size()):
@@ -545,6 +588,9 @@ func _on_player_stepped() -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# The cloud dome follows the camera (it is a sky, not a place).
+	if cloud_dome != null and player != null:
+		cloud_dome.global_position = player.global_position
 	if walkie_cooldown > 0.0:
 		walkie_cooldown -= delta
 	if state == State.TITLE and player != null:

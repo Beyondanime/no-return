@@ -11,13 +11,54 @@ class_name WorldBuilder
 ## The UFO crash site is in Owl Canyon — the far, remote canyon.
 ##
 ## Everything is generated in code: heightmap terrain (hills + bluff ridge +
-## river valley + 18 carved slot canyons + flattened trails), vertex colors,
-## and low-poly primitive props. No imported assets.
+## river valley + 18 carved slot canyons + flattened trails), PBR texture
+## splatting on the terrain, CC0 textures/models from Poly Haven (see
+## ASSET_SOURCES.md), and procedural realistic humanoids (Humanoid).
+## The camcorder VHS overlay stays on top — the 3D underneath just looks real.
+
+const TRIPLANAR_SHADER := preload("res://scripts/triplanar.gdshader")
+const SPLAT_SHADER := preload("res://scripts/terrain_splat.gdshader")
+const WATER_SHADER := preload("res://scripts/water.gdshader")
+const WATERFALL_SHADER := preload("res://scripts/waterfall.gdshader")
+
+# Terrain splat textures (Poly Haven, CC0, 1K).
+const TEX_GRASS := preload("res://assets/textures/forest_ground_04/forest_ground_04_diff_1k.jpg")
+const TEX_GRASS_NOR := preload("res://assets/textures/forest_ground_04/forest_ground_04_nor_gl_1k.jpg")
+const TEX_LEAVES := preload("res://assets/textures/forest_leaves_04/forest_leaves_04_diff_1k.jpg")
+const TEX_LEAVES_NOR := preload("res://assets/textures/forest_leaves_04/forest_leaves_04_nor_gl_1k.jpg")
+const TEX_DIRT := preload("res://assets/textures/dirt_floor/dirt_floor_diff_1k.jpg")
+const TEX_DIRT_NOR := preload("res://assets/textures/dirt_floor/dirt_floor_nor_gl_1k.jpg")
+const TEX_SANDSTONE := preload("res://assets/textures/worn_rock_natural_01/worn_rock_natural_01_diff_1k.jpg")
+const TEX_SANDSTONE_NOR := preload("res://assets/textures/worn_rock_natural_01/worn_rock_natural_01_nor_gl_1k.jpg")
+const TEX_SAND := preload("res://assets/textures/sand_01/sand_01_diff_1k.jpg")
+const TEX_SCORCH := preload("res://assets/textures/burned_ground_01/burned_ground_01_diff_1k.jpg")
+# Structure / prop textures (Poly Haven, CC0, 1K).
+const TEX_PLANKS := preload("res://assets/textures/weathered_planks/weathered_planks_diff_1k.jpg")
+const TEX_PLANKS_NOR := preload("res://assets/textures/weathered_planks/weathered_planks_nor_gl_1k.jpg")
+const TEX_PLANKS_RGH := preload("res://assets/textures/weathered_planks/weathered_planks_rough_1k.jpg")
+const TEX_IRON := preload("res://assets/textures/rusty_corrugated_iron/rusty_corrugated_iron_diff_1k.jpg")
+const TEX_IRON_NOR := preload("res://assets/textures/rusty_corrugated_iron/rusty_corrugated_iron_nor_gl_1k.jpg")
+const TEX_IRON_RGH := preload("res://assets/textures/rusty_corrugated_iron/rusty_corrugated_iron_rough_1k.jpg")
+const TEX_ROCK := preload("res://assets/textures/rock_ground/rock_ground_diff_1k.jpg")
+const TEX_ROCK_NOR := preload("res://assets/textures/rock_ground/rock_ground_nor_gl_1k.jpg")
+const TEX_ROCK_RGH := preload("res://assets/textures/rock_ground/rock_ground_rough_1k.jpg")
+const TEX_BURNED := preload("res://assets/textures/burned_ground_01/burned_ground_01_diff_1k.jpg")
+const TEX_BURNED_NOR := preload("res://assets/textures/burned_ground_01/burned_ground_01_nor_gl_1k.jpg")
+const TEX_BURNED_RGH := preload("res://assets/textures/burned_ground_01/burned_ground_01_rough_1k.jpg")
+const TEX_JERSEY := preload("res://assets/textures/cotton_jersey/cotton_jersey_diff_1k.jpg")
+const TEX_JERSEY_NOR := preload("res://assets/textures/cotton_jersey/cotton_jersey_nor_gl_1k.jpg")
+# Water + UFO (generated here, original).
+const TEX_WATER_NOR := preload("res://assets/generated/water_normal.png")
+const TEX_FALL_STREAKS := preload("res://assets/generated/waterfall_streaks.png")
+const TEX_UFO := preload("res://assets/generated/ufo_panel_albedo.png")
+const TEX_UFO_NOR := preload("res://assets/generated/ufo_panel_normal.png")
+const TEX_UFO_RGH := preload("res://assets/generated/ufo_panel_rough.png")
 
 const SIZE := 360.0
 const GRID := 181
 const STEP := 2.0
 const RIVER_Y := 0.9
+const CRASH_POS := Vector2(-158, -55) # Owl Canyon north end (UFO crash site).
 
 # Canyon defs: name, segment a->b (south->north), width, depth, story?, waterfall?
 # Order matters: [0..3] are the four story canyons, [4] is Owl (crash site),
@@ -275,26 +316,27 @@ func _build_terrain() -> void:
 			verts.append(Vector3(x, h, z))
 			colors.append(_vertex_color(x, z))
 			hmap.append(h)
-	# Triangles, winding (a,d,b),(a,c,d) so faces point +Y.
+	# Triangles. Godot front faces are counter-clockwise as seen from the
+	# front; viewed from above (+Y, +Z down on screen) that is (a,b,d)
+	# and (a,d,c). The old (a,d,b),(a,c,d) order wound clockwise from
+	# above, so generate_normals() pointed every normal DOWN and the
+	# whole terrain was backface-culled (invisible) from above.
 	for gz in range(GRID - 1):
 		for gx in range(GRID - 1):
 			var a := gz * GRID + gx
 			var b := a + 1
 			var c := a + GRID
 			var d := c + 1
-			for tri in [[a, d, b], [a, c, d]]:
+			for tri in [[a, b, d], [a, d, c]]:
 				for vi in tri:
 					st.set_color(colors[vi])
 					st.add_vertex(verts[vi])
 	st.generate_normals()
 	var mesh := st.commit()
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.95
 	var mi := MeshInstance3D.new()
 	mi.name = "Terrain"
 	mi.mesh = mesh
-	mi.material_override = mat
+	mi.material_override = _terrain_splat_mat()
 	add_child(mi)
 	# Collision: HeightMapShape3D — the right tool for a regular grid.
 	# The shape is centered on the body; scale (2,1,2) maps its 1-unit
@@ -312,43 +354,37 @@ func _build_terrain() -> void:
 	add_child(body)
 
 func _vertex_color(x: float, z: float) -> Color:
-	var h := height_at(x, z)
+	# Blend weights for the terrain splat shader (NOT albedo):
+	#   r = trail dirt, g = canyon/sandstone, b = scorched earth, a = river sand.
+	# Everything else is forest floor (grass / dead leaves by noise).
 	var sl := slope_at(x, z)
 	var cf := canyon_factor_at(x, z)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(absf(x * 13.7 + z * 7.3)) + 5
-	var jitter := rng.randf_range(-0.03, 0.03)
 	# Scorched earth around the crash site (Owl Canyon north end).
 	var owl: Dictionary = canyons[4]
 	var dcrash := Vector2(x - owl["b"].x, z - owl["b"].y).length()
-	if dcrash < 14.0:
-		return Color(0.08 + jitter, 0.07 + jitter, 0.06 + jitter)
+	if dcrash < 16.0:
+		return Color(0, 0, smoothstep(16.0, 7.0, dcrash), 0)
 	# River sand.
 	if z < -146.0:
-		return Color(0.62 + jitter, 0.55 + jitter, 0.42 + jitter)
+		return Color(0, 0, 0, clampf((-146.0 - z) / 6.0, 0.0, 1.0))
 	# Trail dirt.
-	if nearest_trail_dist(x, z) < 1.6:
-		return Color(0.42 + jitter, 0.32 + jitter, 0.22 + jitter)
+	var td := nearest_trail_dist(x, z)
+	if td < 2.2:
+		return Color(smoothstep(2.2, 0.8, td), 0, 0, 0)
 	# Sandstone on steep slopes and canyon walls.
-	if sl > 0.55 or cf > 0.55:
-		var t := clampf(sl, 0.0, 1.0)
-		return Color(0.72 + jitter, 0.58 + jitter * 0.5, 0.4 + jitter * 0.5).lerp(Color(0.5, 0.38, 0.26), t * 0.4)
-	# Forest floor: dark moss green, lighter on high ground.
-	var g := 0.16 + clampf(h / 60.0, 0.0, 1.0) * 0.08
-	return Color(0.1 + jitter, g + jitter, 0.08 + jitter)
+	if sl > 0.45 or cf > 0.45:
+		var g := clampf(maxf((sl - 0.35) * 1.6, (cf - 0.3) * 1.8), 0.0, 1.0)
+		return Color(0, g, 0, 0)
+	# Forest floor.
+	return Color(0, 0, 0, 0)
 
 func _build_river() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.12, 0.32, 0.5, 0.85)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.25
-	mat.metallic_specular = 0.6
 	var plane := MeshInstance3D.new()
 	plane.name = "IllinoisRiver"
 	var mesh := PlaneMesh.new()
 	mesh.size = Vector2(SIZE, 40.0)
 	plane.mesh = mesh
-	plane.material_override = mat
+	plane.material_override = _water_mat()
 	plane.position = Vector3(0, RIVER_Y, -162)
 	add_child(plane)
 
@@ -364,6 +400,89 @@ func _mat(color: Color, rough := 0.9, metallic := 0.0, emission := Color(0, 0, 0
 		m.emission = emission
 		m.emission_energy_multiplier = emission_e
 	return m
+
+## World-space triplanar PBR material (no UV stretching on box geometry).
+func _triplanar(albedo: Texture2D, normal: Texture2D, rough: Texture2D,
+		tex_scale := 0.25, tint := Color.WHITE, roughness := 1.0) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = TRIPLANAR_SHADER
+	m.set_shader_parameter("albedo_tex", albedo)
+	m.set_shader_parameter("normal_tex", normal)
+	m.set_shader_parameter("rough_tex", rough)
+	m.set_shader_parameter("tex_scale", tex_scale)
+	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("roughness", roughness)
+	return m
+
+func _planks_mat(tint := Color.WHITE, tex_scale := 0.25) -> ShaderMaterial:
+	return _triplanar(TEX_PLANKS, TEX_PLANKS_NOR, TEX_PLANKS_RGH, tex_scale, tint)
+
+func _iron_mat(tint := Color.WHITE, tex_scale := 0.25) -> ShaderMaterial:
+	return _triplanar(TEX_IRON, TEX_IRON_NOR, TEX_IRON_RGH, tex_scale, tint)
+
+func _rock_mat(tint := Color.WHITE, tex_scale := 0.3) -> ShaderMaterial:
+	return _triplanar(TEX_ROCK, TEX_ROCK_NOR, TEX_ROCK_RGH, tex_scale, tint)
+
+func _burned_mat(tex_scale := 0.2) -> ShaderMaterial:
+	return _triplanar(TEX_BURNED, TEX_BURNED_NOR, TEX_BURNED_RGH, tex_scale)
+
+func _terrain_splat_mat() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = SPLAT_SHADER
+	m.set_shader_parameter("grass_albedo", TEX_GRASS)
+	m.set_shader_parameter("grass_normal", TEX_GRASS_NOR)
+	m.set_shader_parameter("leaves_albedo", TEX_LEAVES)
+	m.set_shader_parameter("leaves_normal", TEX_LEAVES_NOR)
+	m.set_shader_parameter("dirt_albedo", TEX_DIRT)
+	m.set_shader_parameter("dirt_normal", TEX_DIRT_NOR)
+	m.set_shader_parameter("sandstone_albedo", TEX_SANDSTONE)
+	m.set_shader_parameter("sandstone_normal", TEX_SANDSTONE_NOR)
+	m.set_shader_parameter("sand_albedo", TEX_SAND)
+	m.set_shader_parameter("scorch_albedo", TEX_SCORCH)
+	return m
+
+func _water_mat() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = WATER_SHADER
+	m.set_shader_parameter("normal_tex", TEX_WATER_NOR)
+	return m
+
+func _waterfall_mat() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = WATERFALL_SHADER
+	m.set_shader_parameter("streak_tex", TEX_FALL_STREAKS)
+	return m
+
+## Fabric (tents, sleeping bags): jersey weave tinted to the fabric color.
+func _fabric_mat(tint: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = TEX_JERSEY
+	m.normal_texture = TEX_JERSEY_NOR
+	m.albedo_color = tint
+	m.roughness = 0.95
+	return m
+
+## UFO hull: panelled gunmetal, metallic.
+func _ufo_hull_mat() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = TEX_UFO
+	m.normal_texture = TEX_UFO_NOR
+	m.roughness_texture = TEX_UFO_RGH
+	m.metallic = 0.85
+	m.roughness = 1.0
+	m.uv1_scale = Vector3(4, 2, 1)
+	return m
+
+## Instance a CC0 GLTF prop (boulder, dead trunk) at a spot.
+func _place_gltf(parent: Node3D, scene_path: String, pos: Vector3,
+		rot := Vector3.ZERO, scale_f := 1.0) -> Node3D:
+	var ps: PackedScene = load(scene_path)
+	var inst := ps.instantiate()
+	inst.position = pos
+	inst.rotation = rot
+	inst.scale = Vector3.ONE * scale_f
+	parent.add_child(inst)
+	return inst
 
 func _box(parent: Node3D, pos: Vector3, size: Vector3, mat: Material, rot_y := 0.0, rot_x := 0.0, rot_z := 0.0) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -431,9 +550,9 @@ func _label(parent: Node3D, pos: Vector3, text: String, size := 32, color := Col
 
 func _sign(parent: Node3D, pos: Vector2, lines: String, yaw := 0.0, board_color := Color(0.35, 0.25, 0.14)) -> void:
 	var gy := ground_height_at(pos.x, pos.y)
-	_cyl(parent, Vector3(pos.x, gy + 1.1, pos.y), 0.06, 0.06, 2.2, _mat(Color(0.3, 0.22, 0.13)))
+	_cyl(parent, Vector3(pos.x, gy + 1.1, pos.y), 0.06, 0.06, 2.2, _planks_mat())
 	var n_lines := lines.split("\n").size()
-	_box(parent, Vector3(pos.x, gy + 2.1, pos.y), Vector3(2.2, 0.35 + 0.3 * n_lines, 0.08), _mat(board_color), yaw)
+	_box(parent, Vector3(pos.x, gy + 2.1, pos.y), Vector3(2.2, 0.35 + 0.3 * n_lines, 0.08), _planks_mat(board_color.lightened(0.45)), yaw)
 	_label(parent, Vector3(pos.x, gy + 2.15, pos.y), lines, 30, Color(0.95, 0.9, 0.75), yaw)
 
 func _cabin(parent: Node3D, pos: Vector2, size: Vector3, wall_color: Color, roof_color: Color, yaw := 0.0, boarded := true) -> Node3D:
@@ -442,36 +561,26 @@ func _cabin(parent: Node3D, pos: Vector2, size: Vector3, wall_color: Color, roof
 	cabin.position = Vector3(pos.x, gy, pos.y)
 	cabin.rotation.y = yaw
 	parent.add_child(cabin)
-	_box(cabin, Vector3(0, size.y * 0.5, 0), size, _mat(wall_color))
+	# Real weathered-plank walls and rusty corrugated-iron roof (triplanar,
+	# so the texture doesn't stretch on the big boxes). The old colors
+	# survive as tints, lightened so they don't double-darken the texture.
+	_box(cabin, Vector3(0, size.y * 0.5, 0), size, _planks_mat(wall_color.lightened(0.55)))
 	var roof := MeshInstance3D.new()
 	var prism := PrismMesh.new()
 	prism.size = Vector3(size.x + 0.8, size.y * 0.55, size.z + 0.8)
 	roof.mesh = prism
-	roof.material_override = _mat(roof_color)
+	roof.material_override = _iron_mat(roof_color.lightened(0.55))
 	roof.position = Vector3(0, size.y + size.y * 0.27, 0)
 	cabin.add_child(roof)
 	# Door.
-	_box(cabin, Vector3(0, size.y * 0.28, size.z * 0.5 + 0.03), Vector3(0.9, size.y * 0.55, 0.06), _mat(Color(0.2, 0.14, 0.09)))
+	_box(cabin, Vector3(0, size.y * 0.28, size.z * 0.5 + 0.03), Vector3(0.9, size.y * 0.55, 0.06), _planks_mat(Color(0.25, 0.2, 0.16)))
 	if boarded:
 		# Boarded-up windows: dark rectangles with plank crosses.
 		for sx in [-1.0, 1.0]:
 			_box(cabin, Vector3(sx * size.x * 0.28, size.y * 0.6, size.z * 0.5 + 0.03), Vector3(0.8, 0.8, 0.05), _mat(Color(0.05, 0.05, 0.06)))
-			_box(cabin, Vector3(sx * size.x * 0.28, size.y * 0.6, size.z * 0.5 + 0.07), Vector3(0.95, 0.12, 0.04), _mat(Color(0.45, 0.35, 0.2)), 0.0, 0.0, 0.5)
-			_box(cabin, Vector3(sx * size.x * 0.28, size.y * 0.6, size.z * 0.5 + 0.07), Vector3(0.95, 0.12, 0.04), _mat(Color(0.45, 0.35, 0.2)), 0.0, 0.0, -0.5)
+			_box(cabin, Vector3(sx * size.x * 0.28, size.y * 0.6, size.z * 0.5 + 0.07), Vector3(0.95, 0.12, 0.04), _planks_mat(Color(0.55, 0.45, 0.3)), 0.0, 0.0, 0.5)
+			_box(cabin, Vector3(sx * size.x * 0.28, size.y * 0.6, size.z * 0.5 + 0.07), Vector3(0.95, 0.12, 0.04), _planks_mat(Color(0.55, 0.45, 0.3)), 0.0, 0.0, -0.5)
 	return cabin
-
-func _pine(parent: Node3D, pos: Vector3, scale_f := 1.0, scorched := false) -> Node3D:
-	var tree := Node3D.new()
-	tree.position = pos
-	tree.scale = Vector3.ONE * scale_f
-	parent.add_child(tree)
-	var trunk_mat := _mat(Color(0.05, 0.04, 0.03) if scorched else Color(0.25, 0.16, 0.1))
-	var leaf_mat := _mat(Color(0.02, 0.02, 0.02) if scorched else Color(0.08, 0.2, 0.08))
-	_cyl(tree, Vector3(0, 1.0, 0), 0.14, 0.2, 2.0, trunk_mat)
-	_cone(tree, Vector3(0, 3.0, 0), 1.5, 3.0, leaf_mat)
-	_cone(tree, Vector3(0, 4.6, 0), 1.1, 2.4, leaf_mat)
-	_cone(tree, Vector3(0, 6.0, 0), 0.7, 1.8, leaf_mat)
-	return tree
 
 func _waterfall(parent: Node3D, c: Dictionary) -> void:
 	var a: Vector2 = c["a"]
@@ -481,27 +590,16 @@ func _waterfall(parent: Node3D, c: Dictionary) -> void:
 	var yaw := atan2(-dir.x, -dir.y)
 	var floor_h: float = c["floor_h"]
 	var w: float = c["width"]
-	var fall_mat := StandardMaterial3D.new()
-	fall_mat.albedo_color = Color(0.85, 0.92, 1.0, 0.7)
-	fall_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	fall_mat.roughness = 0.15
-	fall_mat.emission_enabled = true
-	fall_mat.emission = Color(0.6, 0.75, 0.9)
-	fall_mat.emission_energy_multiplier = 0.4
-	# Veil across the canyon, top at rim height.
-	_box(parent, Vector3(mid.x, floor_h + 6.0, mid.y), Vector3(w * 0.7, 12.0, 0.25), fall_mat, yaw)
+	# Veil across the canyon, top at rim height — falling water, not a sheet.
+	_box(parent, Vector3(mid.x, floor_h + 6.0, mid.y), Vector3(w * 0.7, 12.0, 0.25), _waterfall_mat(), yaw)
 	# Pool at the base.
-	var pool_mat := StandardMaterial3D.new()
-	pool_mat.albedo_color = Color(0.15, 0.4, 0.55, 0.85)
-	pool_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	pool_mat.roughness = 0.15
 	var pool := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = w * 0.45
 	cyl.bottom_radius = w * 0.45
 	cyl.height = 0.2
 	pool.mesh = cyl
-	pool.material_override = pool_mat
+	pool.material_override = _water_mat()
 	pool.position = Vector3(mid.x, floor_h + 0.15, mid.y)
 	parent.add_child(pool)
 
@@ -513,9 +611,9 @@ func _build_structures() -> void:
 	add_child(root)
 	# --- Entrance gate (south, z=155): chained gate, CLOSED signs.
 	var gate_y := ground_height_at(0, 155)
-	_cyl(root, Vector3(-3.2, gate_y + 1.4, 155), 0.14, 0.14, 2.8, _mat(Color(0.25, 0.2, 0.15)))
-	_cyl(root, Vector3(3.2, gate_y + 1.4, 155), 0.14, 0.14, 2.8, _mat(Color(0.25, 0.2, 0.15)))
-	_box(root, Vector3(0, gate_y + 2.4, 155), Vector3(6.6, 0.3, 0.15), _mat(Color(0.3, 0.24, 0.16)))
+	_cyl(root, Vector3(-3.2, gate_y + 1.4, 155), 0.14, 0.14, 2.8, _planks_mat())
+	_cyl(root, Vector3(3.2, gate_y + 1.4, 155), 0.14, 0.14, 2.8, _planks_mat())
+	_box(root, Vector3(0, gate_y + 2.4, 155), Vector3(6.6, 0.3, 0.15), _planks_mat())
 	# Sagging chain: small links along a catenary dip.
 	for i in range(11):
 		var t := float(i) / 10.0
@@ -526,17 +624,17 @@ func _build_structures() -> void:
 	_sign(root, Vector2(4.5, 153), "CLOSED\nNO ENTRY", 0.0, Color(0.45, 0.1, 0.08))
 	# --- Empty parking lot (park is closed): asphalt + marked bays, no cars.
 	var lot_y := ground_height_at(0, 138)
-	_box(root, Vector3(0, lot_y + 0.05, 138), Vector3(34, 0.12, 20), _mat(Color(0.12, 0.12, 0.13)))
+	_box(root, Vector3(0, lot_y + 0.05, 138), Vector3(34, 0.12, 20), _rock_mat(Color(0.35, 0.35, 0.36), 0.12))
 	for i in range(6):
 		_box(root, Vector3(-12.5 + float(i) * 5.0, lot_y + 0.13, 138), Vector3(0.15, 0.02, 4.5), _mat(Color(0.85, 0.85, 0.8)))
 	_sign(root, Vector2(19, 138), "PARKING\nLOT CLOSED", 0.0)
 	# --- The Lodge (shuttered): big cabin, boarded windows, CLOSED sign.
 	var lodge := _cabin(root, Vector2(-18, 118), Vector3(12, 5, 8), Color(0.4, 0.28, 0.16), Color(0.25, 0.16, 0.1), 0.15, true)
-	_box(lodge, Vector3(0, 5.6, 4.4), Vector3(4.0, 0.9, 0.1), _mat(Color(0.3, 0.22, 0.12)))
+	_box(lodge, Vector3(0, 5.6, 4.4), Vector3(4.0, 0.9, 0.1), _planks_mat())
 	_label(lodge, Vector3(0, 6.6, 4.4), "STARVED ROCK LODGE", 36, Color(0.95, 0.9, 0.75))
 	_label(lodge, Vector3(0, 5.6, 4.4), "CLOSED", 30, Color(0.9, 0.2, 0.15))
 	# Porch.
-	_box(lodge, Vector3(0, 0.25, 5.2), Vector3(10, 0.5, 2.4), _mat(Color(0.35, 0.26, 0.16)))
+	_box(lodge, Vector3(0, 0.25, 5.2), Vector3(10, 0.5, 2.4), _planks_mat())
 	# --- Cabins near the lodge.
 	_cabin(root, Vector2(-42, 128), Vector3(6, 3.5, 5), Color(0.38, 0.27, 0.15), Color(0.22, 0.14, 0.09), -0.3, true)
 	_cabin(root, Vector2(-46, 104), Vector3(6, 3.5, 5), Color(0.36, 0.26, 0.15), Color(0.22, 0.14, 0.09), 0.4, true)
@@ -563,18 +661,18 @@ func _build_structures() -> void:
 		var pm := PrismMesh.new()
 		pm.size = Vector3(2.4, 1.6, 2.8)
 		prism.mesh = pm
-		prism.material_override = _mat(tent_colors[i])
+		prism.material_override = _fabric_mat(tent_colors[i])
 		prism.position = tent_spots[i]
 		prism.rotation.y = float(i) * 0.5
 		camp.add_child(prism)
 		# Sleeping bag outside each tent.
-		_box(camp, tent_spots[i] + Vector3(0, 0.25, 1.8), Vector3(0.8, 0.4, 1.9), _mat(Color(0.2, 0.25, 0.4)), float(i) * 0.5)
+		_box(camp, tent_spots[i] + Vector3(0, 0.25, 1.8), Vector3(0.8, 0.4, 1.9), _fabric_mat(Color(0.2, 0.25, 0.4)), float(i) * 0.5)
 	# Campfire: stone ring + logs + flickering light.
 	for i in range(8):
 		var a := TAU * float(i) / 8.0
-		_box(camp, Vector3(cos(a) * 0.9, 0.25, sin(a) * 0.9), Vector3(0.4, 0.5, 0.3), _mat(Color(0.4, 0.38, 0.36)), a)
+		_box(camp, Vector3(cos(a) * 0.9, 0.25, sin(a) * 0.9), Vector3(0.4, 0.5, 0.3), _rock_mat(), a)
 	for i in range(3):
-		_cyl(camp, Vector3(0, 0.35, 0), 0.09, 0.09, 1.1, _mat(Color(0.2, 0.12, 0.07)), Vector3(0, 0, 1.2 + float(i) * 1.0))
+		_cyl(camp, Vector3(0, 0.35, 0), 0.09, 0.09, 1.1, _planks_mat(Color(0.35, 0.25, 0.16)), Vector3(0, 0, 1.2 + float(i) * 1.0))
 	fire_light = OmniLight3D.new()
 	fire_light.name = "FireLight"
 	fire_light.position = Vector3(0, 0.9, 0)
@@ -636,12 +734,12 @@ func _overlook(parent: Node3D, pos: Vector2, label_text: String) -> void:
 	parent.add_child(ov)
 	# Wooden railing facing the river (north, -z).
 	for i in range(6):
-		_cyl(ov, Vector3(-3.0 + float(i) * 1.2, 0.6, -1.5), 0.06, 0.06, 1.2, _mat(Color(0.3, 0.22, 0.13)))
-	_box(ov, Vector3(0, 1.15, -1.5), Vector3(6.2, 0.1, 0.1), _mat(Color(0.32, 0.24, 0.14)))
-	_box(ov, Vector3(0, 0.7, -1.5), Vector3(6.2, 0.08, 0.08), _mat(Color(0.32, 0.24, 0.14)))
+		_cyl(ov, Vector3(-3.0 + float(i) * 1.2, 0.6, -1.5), 0.06, 0.06, 1.2, _planks_mat())
+	_box(ov, Vector3(0, 1.15, -1.5), Vector3(6.2, 0.1, 0.1), _planks_mat())
+	_box(ov, Vector3(0, 0.7, -1.5), Vector3(6.2, 0.08, 0.08), _planks_mat())
 	# Sign, built in local space (the overlook node already sits on the ground).
-	_cyl(ov, Vector3(0, 1.1, 1.0), 0.06, 0.06, 2.2, _mat(Color(0.3, 0.22, 0.13)))
-	_box(ov, Vector3(0, 2.1, 1.0), Vector3(2.2, 0.95, 0.08), _mat(Color(0.35, 0.25, 0.14)))
+	_cyl(ov, Vector3(0, 1.1, 1.0), 0.06, 0.06, 2.2, _planks_mat())
+	_box(ov, Vector3(0, 2.1, 1.0), Vector3(2.2, 0.95, 0.08), _planks_mat())
 	_label(ov, Vector3(0, 2.15, 1.0), label_text + "\nOVERLOOK", 30, Color(0.95, 0.9, 0.75))
 
 # ------------------------------------------------------------------ props ---
@@ -652,73 +750,33 @@ func _build_props() -> void:
 	add_child(root)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
-	var hub := Vector2(0, 115)
 	var owl: Dictionary = canyons[4]
 	var crash := Vector2(owl["b"].x, owl["b"].y)
-	# Pines.
-	var placed := 0
-	var tries := 0
-	while placed < 140 and tries < 2500:
-		tries += 1
-		var x := rng.randf_range(-175, 175)
-		var z := rng.randf_range(-175, 175)
-		if z < -146.0:
-			continue
-		if Vector2(x, z).distance_to(hub) < 26.0:
-			continue
-		if Vector2(x, z).distance_to(crash) < 22.0:
-			continue
-		if nearest_trail_dist(x, z) < 2.5:
-			continue
-		if canyon_factor_at(x, z) > 0.3:
-			continue
-		if slope_at(x, z) > 0.5:
-			continue
-		_pine(root, Vector3(x, ground_height_at(x, z), z), rng.randf_range(0.8, 1.4))
-		placed += 1
-	# Bushes / ferns.
-	placed = 0
-	tries = 0
-	while placed < 60 and tries < 1200:
-		tries += 1
-		var x := rng.randf_range(-170, 170)
-		var z := rng.randf_range(-170, 170)
-		if z < -146.0 or Vector2(x, z).distance_to(hub) < 24.0:
-			continue
-		if nearest_trail_dist(x, z) < 2.0 or canyon_factor_at(x, z) > 0.4:
-			continue
-		_sphere(root, Vector3(x, ground_height_at(x, z) + 0.3, z), rng.randf_range(0.5, 0.9), _mat(Color(0.07, 0.18, 0.07)), 0.6)
-		placed += 1
-	# Boulders (some in the canyons).
-	placed = 0
-	tries = 0
-	while placed < 80 and tries < 1500:
-		tries += 1
-		var x := rng.randf_range(-175, 175)
-		var z := rng.randf_range(-175, 175)
-		if z < -146.0 or Vector2(x, z).distance_to(hub) < 24.0:
-			continue
-		if nearest_trail_dist(x, z) < 2.0:
-			continue
-		var s := rng.randf_range(0.5, 1.8)
-		_box(root, Vector3(x, ground_height_at(x, z) + s * 0.25, z), Vector3(s, s * 0.7, s), _mat(Color(0.45, 0.42, 0.38)), rng.randf_range(0, TAU))
-		placed += 1
-	# Scorched / toppled pines around the crater.
+	# All trees, grass, ferns, shrubs, moss, boulders, stumps and dead
+	# trunks come from the instanced vegetation system (real CC0 models and
+	# alpha-cutout foliage — no more cones on cylinders).
+	Vegetation.populate(root, self)
+	# Scorched / toppled pines around the crater (real dead-trunk models,
+	# knocked flat and charred by the blast).
 	for i in range(10):
 		var a := TAU * float(i) / 10.0 + 0.3
 		var d := rng.randf_range(15.0, 24.0)
 		var x := crash.x + cos(a) * d
 		var z := crash.y + sin(a) * d
-		var tree := _pine(root, Vector3(x, ground_height_at(x, z), z), rng.randf_range(0.9, 1.3), true)
-		tree.rotation = Vector3(rng.randf_range(0.3, 0.9), rng.randf_range(0, TAU), rng.randf_range(-0.4, 0.4))
-	# Dead trees inside the fenced crash area.
+		_place_gltf(root, Vegetation.DEAD_TRUNK_SCENE,
+			Vector3(x, ground_height_at(x, z) + 0.3, z),
+			Vector3(PI * 0.5 + rng.randf_range(-0.3, 0.3), rng.randf_range(0, TAU), 0),
+			rng.randf_range(0.9, 1.3))
+	# Dead trees inside the fenced crash area, lying flat.
 	for i in range(12):
 		var a := TAU * float(i) / 12.0
 		var d := rng.randf_range(8.0, 18.0)
 		var x := crash.x + cos(a) * d
 		var z := crash.y + sin(a) * d
-		var gy := ground_height_at(x, z)
-		_cyl(root, Vector3(x, gy + 1.5, z), 0.08, 0.14, 3.0, _mat(Color(0.06, 0.05, 0.04)), Vector3(rng.randf_range(-0.25, 0.25), 0, rng.randf_range(-0.25, 0.25)))
+		_place_gltf(root, Vegetation.DEAD_TRUNK_SCENE,
+			Vector3(x, ground_height_at(x, z) + 0.3, z),
+			Vector3(PI * 0.5, rng.randf_range(0, TAU), 0),
+			rng.randf_range(0.8, 1.2))
 
 # ------------------------------------------------------------- crash site ---
 
@@ -731,31 +789,33 @@ func _build_crash_site() -> void:
 	var cz: float = owl["b"].y
 	var cy: float = owl["floor_h"]
 	var center := Vector3(cx, cy, cz)
-	# Scorched crater disc.
+	# Scorched crater disc (burned-ground texture, triplanar).
 	var crater := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 13.0
 	cyl.bottom_radius = 13.0
 	cyl.height = 0.3
 	crater.mesh = cyl
-	crater.material_override = _mat(Color(0.05, 0.045, 0.04))
+	crater.material_override = _burned_mat(0.15)
 	crater.position = center + Vector3(0, 0.1, 0)
 	root.add_child(crater)
-	# Blasted-rock rim.
+	# Blasted-rock rim: real boulders, charred.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99
 	for i in range(14):
 		var a := TAU * float(i) / 14.0
 		var d := rng.randf_range(12.0, 14.5)
 		var s := rng.randf_range(1.2, 2.6)
-		_box(root, Vector3(cx + cos(a) * d, cy + 0.4, cz + sin(a) * d), Vector3(s, s * 0.6, s), _mat(Color(0.1, 0.09, 0.08)), rng.randf_range(0, TAU))
-	# The craft: tilted disc + dome, metallic hull, 8 blinking rim lights.
+		_place_gltf(root, Vegetation.BOULDER_SCENE,
+			Vector3(cx + cos(a) * d, cy + 0.4, cz + sin(a) * d),
+			Vector3(0, rng.randf_range(0, TAU), 0), s)
+	# The craft: tilted disc + dome, panelled metallic hull, 8 blinking rim lights.
 	var craft := Node3D.new()
 	craft.name = "Craft"
 	craft.position = center + Vector3(0, 1.2, 0)
 	craft.rotation = Vector3(0.12, 0.7, -0.18)
 	root.add_child(craft)
-	var hull_mat := _mat(Color(0.55, 0.58, 0.62), 0.25, 0.85)
+	var hull_mat := _ufo_hull_mat()
 	var hull := MeshInstance3D.new()
 	var hull_mesh := CylinderMesh.new()
 	hull_mesh.top_radius = 3.2
@@ -827,7 +887,7 @@ func _build_crash_site() -> void:
 		var x := cx + cos(a) * 22.0
 		var z := cz + sin(a) * 22.0
 		var gy := ground_height_at(x, z)
-		_cyl(root, Vector3(x, gy + 0.9, z), 0.07, 0.07, 1.8, _mat(Color(0.35, 0.3, 0.22)))
+		_cyl(root, Vector3(x, gy + 0.9, z), 0.07, 0.07, 1.8, _planks_mat())
 		if i % 2 == 0:
 			var a2 := TAU * float(i + 1) / 28.0
 			var x2 := cx + cos(a2) * 22.0
@@ -835,7 +895,7 @@ func _build_crash_site() -> void:
 			var gy2 := ground_height_at(x2, z2)
 			var mid := Vector3((x + x2) * 0.5, (gy + gy2) * 0.5 + 1.5, (z + z2) * 0.5)
 			var span := Vector3(x2 - x, 0, z2 - z).length()
-			var rail := _box(root, mid, Vector3(span, 0.08, 0.08), _mat(Color(0.35, 0.3, 0.22)))
+			var rail := _box(root, mid, Vector3(span, 0.08, 0.08), _planks_mat())
 			rail.rotation.y = atan2(-(z2 - z), x2 - x)
 	_sign(root, Vector2(cx + 22, cz), "RESTRICTED\nDO NOT ENTER", 0.0, Color(0.45, 0.1, 0.08))
 	_sign(root, Vector2(cx - 16, cz + 15), "RESTRICTED\nDO NOT ENTER", 0.0, Color(0.45, 0.1, 0.08))
@@ -902,20 +962,10 @@ func _build_animals() -> void:
 # ------------------------------------------------------------------ figure ---
 
 func _build_figure() -> void:
-	# The "ranger": a normal-height man in dark clothes and a wide-brim hat.
-	# He is a misdirection — the first explanation that makes sense — and he
-	# is never what he seems. Swappable later for whatever the truth needs.
-	figure = Node3D.new()
-	figure.name = "Figure"
+	# The "ranger": a realistically-built man in a dark coat and wide-brim
+	# hat (Humanoid). He is a misdirection — the first explanation that
+	# makes sense — and he is never what he seems. Swappable later for
+	# whatever the truth needs.
+	figure = Humanoid.build_figure(self)
 	figure.visible = false
-	add_child(figure)
-	var dark := _mat(Color(0.08, 0.09, 0.08))
-	var skin := _mat(Color(0.75, 0.6, 0.48))
-	_cyl(figure, Vector3(0, 1.0, 0), 0.22, 0.26, 1.5, dark) # coat
-	_cyl(figure, Vector3(-0.12, 0.4, 0), 0.09, 0.09, 0.8, dark)
-	_cyl(figure, Vector3(0.12, 0.4, 0), 0.09, 0.09, 0.8, dark)
-	_sphere(figure, Vector3(0, 1.85, 0), 0.2, skin)
-	# Wide-brim hat: brim disc + crown.
-	_cyl(figure, Vector3(0, 2.0, 0), 0.42, 0.42, 0.05, _mat(Color(0.12, 0.1, 0.08)))
-	_cyl(figure, Vector3(0, 2.12, 0), 0.16, 0.2, 0.22, _mat(Color(0.12, 0.1, 0.08)))
 	figure.position = figure_spots[0] if figure_spots.size() > 0 else Vector3.ZERO
